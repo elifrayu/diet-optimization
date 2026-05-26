@@ -2,7 +2,10 @@
 NSGA-II vs SPEA2 Algorithm Comparison
 
 Runs both algorithms with identical parameters and compares results.
+Also compares diversity_mode="none" and diversity_mode="penalty".
 """
+
+import csv
 
 from nsga2 import nsga2
 from spea2 import spea2
@@ -14,7 +17,7 @@ from metrics import (
 
 
 def deduplicate_solutions(individuals):
-    """Remove duplicate solutions (works for both NSGA-II and SPEA2)"""
+    """Remove duplicate solutions."""
     seen = {}
     unique = []
 
@@ -33,24 +36,23 @@ def deduplicate_solutions(individuals):
     return unique
 
 
-def analyze_solutions(individuals, algorithm_name="Algorithm"):
-    """Analyze front/archive solutions"""
+def analyze_solutions(individuals):
+    """Analyze front/archive solutions."""
     if not individuals:
         return None
 
-    preferences = [ind.fitness_result['preference'] for ind in individuals]
-    costs = [ind.fitness_result['cost'] for ind in individuals]
-    co2s = [ind.fitness_result['co2'] for ind in individuals]
-    nutrient_penalties = [ind.fitness_result['nutrient_penalty'] for ind in individuals]
-    total_penalties = [ind.fitness_result['total_penalty'] for ind in individuals]
-    diversities = [ind.fitness_result['diversity_count'] for ind in individuals]
+    preferences = [ind.fitness_result["preference"] for ind in individuals]
+    costs = [ind.fitness_result["cost"] for ind in individuals]
+    co2s = [ind.fitness_result["co2"] for ind in individuals]
+    nutrient_penalties = [ind.fitness_result["nutrient_penalty"] for ind in individuals]
+    total_penalties = [ind.fitness_result["total_penalty"] for ind in individuals]
+    diversities = [ind.fitness_result["diversity_count"] for ind in individuals]
 
-    # Constraint compliance
     compliances = []
     for ind in individuals:
         compliance = calculate_constraint_compliance(
-            ind.fitness_result['totals'],
-            ind.fitness_result['dri']
+            ind.fitness_result["totals"],
+            ind.fitness_result["dri"]
         )
         compliances.append(compliance)
 
@@ -72,137 +74,221 @@ def analyze_solutions(individuals, algorithm_name="Algorithm"):
     }
 
 
-print("\n" + "="*80)
-print("NSGA-II vs SPEA2 - COMPREHENSIVE COMPARISON")
-print("="*80)
-print("\nConfiguration:")
-print("  population_size: 50")
-print("  generations: 50")
-print("  objective_names: ('preference', 'cost', 'co2')")
-print("  lambda_penalty: 10.0")
-print("  diversity_mode: 'none'")
-print("  seed: 42")
+def print_stats(title, result_count, unique_stats, original_count):
+    """Print algorithm statistics."""
 
-all_objectives_by_user = {}
+    print(f"\n{title} Results:")
+    print(f"  Total Final Solutions: {result_count}")
+    print(f"  Unique Solutions: {unique_stats['count']}")
+    print(f"  Duplicates Removed: {original_count - unique_stats['count']}")
 
-for user_id in [1, 2]:
-    print(f"\n{'='*80}")
-    print(f"USER {user_id}")
-    print(f"{'='*80}")
-
-    # Run NSGA-II
-    print("\n[Running NSGA-II...]")
-    nsga2_result = nsga2(
-        user_id=user_id,
-        population_size=50,
-        generations=50,
-        objective_names=("preference", "cost", "co2"),
-        lambda_penalty=10.0,
-        diversity_mode="none",
-        random_seed=42
-    )
-
-    # Run SPEA2
-    print("[Running SPEA2...]")
-    spea2_result = spea2(
-        user_id=user_id,
-        population_size=50,
-        generations=50,
-        objective_names=("preference", "cost", "co2"),
-        lambda_penalty=10.0,
-        diversity_mode="none",
-        random_seed=42
-    )
-
-    # Deduplicate
-    nsga2_unique = deduplicate_solutions(nsga2_result['best_front'])
-    spea2_unique = deduplicate_solutions(spea2_result['best_individuals'])
-
-    # Analyze
-    nsga2_stats = analyze_solutions(nsga2_unique, "NSGA-II")
-    spea2_stats = analyze_solutions(spea2_unique, "SPEA2")
-
-    # Store for hypervolume calculation
-    all_objectives_by_user[user_id] = {
-        "nsga2": nsga2_stats["objectives"],
-        "spea2": spea2_stats["objectives"]
-    }
-
-    # Print NSGA-II results
-    print(f"\nNSGA-II Results:")
-    print(f"  Total Final Solutions: {len(nsga2_result['best_front'])}")
-    print(f"  Unique Solutions: {nsga2_stats['count']}")
-    print(f"  Duplicates Removed: {len(nsga2_result['best_front']) - nsga2_stats['count']}")
     print(f"\n  Averages:")
-    print(f"    Preference:             {nsga2_stats['avg_preference']:8.2f}")
-    print(f"    Cost:                   {nsga2_stats['avg_cost']:8.2f}")
-    print(f"    CO2:                    {nsga2_stats['avg_co2']:8.2f}")
-    print(f"    Nutrient Penalty:       {nsga2_stats['avg_nutrient_penalty']:8.4f}")
-    print(f"    Total Penalty:          {nsga2_stats['avg_total_penalty']:8.4f}")
-    print(f"    Constraint Compliance:  {nsga2_stats['avg_constraint_compliance']:5.2f}/5")
-    print(f"    Diversity:              {nsga2_stats['avg_diversity']:5.2f} groups")
+    print(f"    Preference:             {unique_stats['avg_preference']:8.2f}")
+    print(f"    Cost:                   {unique_stats['avg_cost']:8.2f}")
+    print(f"    CO2:                    {unique_stats['avg_co2']:8.2f}")
+    print(f"    Nutrient Penalty:       {unique_stats['avg_nutrient_penalty']:8.4f}")
+    print(f"    Total Penalty:          {unique_stats['avg_total_penalty']:8.4f}")
+    print(f"    Constraint Compliance:  {unique_stats['avg_constraint_compliance']:5.2f}/5")
+    print(f"    Diversity:              {unique_stats['avg_diversity']:5.2f} groups")
+
     print(f"\n  Ranges:")
-    print(f"    Preference: [{nsga2_stats['preference_range'][0]:7.2f}, {nsga2_stats['preference_range'][1]:7.2f}]")
-    print(f"    Cost:       [{nsga2_stats['cost_range'][0]:7.2f}, {nsga2_stats['cost_range'][1]:7.2f}]")
-    print(f"    CO2:        [{nsga2_stats['co2_range'][0]:7.2f}, {nsga2_stats['co2_range'][1]:7.2f}]")
+    print(f"    Preference: [{unique_stats['preference_range'][0]:7.2f}, {unique_stats['preference_range'][1]:7.2f}]")
+    print(f"    Cost:       [{unique_stats['cost_range'][0]:7.2f}, {unique_stats['cost_range'][1]:7.2f}]")
+    print(f"    CO2:        [{unique_stats['co2_range'][0]:7.2f}, {unique_stats['co2_range'][1]:7.2f}]")
 
-    # Print SPEA2 results
-    print(f"\nSPEA2 Results:")
-    print(f"  Total Final Solutions: {len(spea2_result['best_individuals'])}")
-    print(f"  Unique Solutions: {spea2_stats['count']}")
-    print(f"  Duplicates Removed: {len(spea2_result['best_individuals']) - spea2_stats['count']}")
-    print(f"\n  Averages:")
-    print(f"    Preference:             {spea2_stats['avg_preference']:8.2f}")
-    print(f"    Cost:                   {spea2_stats['avg_cost']:8.2f}")
-    print(f"    CO2:                    {spea2_stats['avg_co2']:8.2f}")
-    print(f"    Nutrient Penalty:       {spea2_stats['avg_nutrient_penalty']:8.4f}")
-    print(f"    Total Penalty:          {spea2_stats['avg_total_penalty']:8.4f}")
-    print(f"    Constraint Compliance:  {spea2_stats['avg_constraint_compliance']:5.2f}/5")
-    print(f"    Diversity:              {spea2_stats['avg_diversity']:5.2f} groups")
-    print(f"\n  Ranges:")
-    print(f"    Preference: [{spea2_stats['preference_range'][0]:7.2f}, {spea2_stats['preference_range'][1]:7.2f}]")
-    print(f"    Cost:       [{spea2_stats['cost_range'][0]:7.2f}, {spea2_stats['cost_range'][1]:7.2f}]")
-    print(f"    CO2:        [{spea2_stats['co2_range'][0]:7.2f}, {spea2_stats['co2_range'][1]:7.2f}]")
 
-# Hypervolume calculation
-print(f"\n{'='*80}")
-print("HYPERVOLUME ANALYSIS")
-print(f"{'='*80}\n")
+def run_experiment():
 
-for user_id in [1, 2]:
-    all_objectives = (
-        all_objectives_by_user[user_id]["nsga2"] +
-        all_objectives_by_user[user_id]["spea2"]
-    )
+    print("\n" + "=" * 80)
+    print("NSGA-II vs SPEA2 - COMPREHENSIVE COMPARISON")
+    print("=" * 80)
 
-    ref_point = get_reference_point(all_objectives, margin=0.10)
+    print("\nConfiguration:")
+    print("  population_size: 50")
+    print("  generations: 50")
+    print("  objective_names: ('preference', 'cost', 'co2')")
+    print("  lambda_penalty: 10.0")
+    print("  diversity_modes: ['none', 'penalty']")
+    print("  seed: 42")
 
-    nsga2_hv = approximate_hypervolume(
-        all_objectives_by_user[user_id]["nsga2"],
-        ref_point,
-        samples=20000,
-        seed=42
-    )
-    spea2_hv = approximate_hypervolume(
-        all_objectives_by_user[user_id]["spea2"],
-        ref_point,
-        samples=20000,
-        seed=42
-    )
+    all_objectives_by_case = {}
+    summary_rows = []
 
-    print(f"User {user_id}:")
-    print(f"  Reference Point: {tuple(f'{x:.2f}' for x in ref_point)}")
-    print(f"  NSGA-II Hypervolume: {nsga2_hv:.2f}")
-    print(f"  SPEA2 Hypervolume:   {spea2_hv:.2f}")
-    print(f"  Winner: {'NSGA-II' if nsga2_hv > spea2_hv else 'SPEA2'} ({abs(nsga2_hv - spea2_hv):.2f} difference)")
-    print()
+    for diversity_mode in ["none", "penalty"]:
 
-print("="*80)
-print("SUMMARY")
-print("="*80)
-print("""
+        print(f"\n{'#' * 80}")
+        print(f"DIVERSITY MODE: {diversity_mode}")
+        print(f"{'#' * 80}")
+
+        for user_id in [1, 2]:
+
+            print(f"\n{'=' * 80}")
+            print(f"USER {user_id}")
+            print(f"{'=' * 80}")
+
+            # NSGA-II
+            print("\n[Running NSGA-II...]")
+
+            nsga2_result = nsga2(
+                user_id=user_id,
+                population_size=50,
+                generations=50,
+                objective_names=("preference", "cost", "co2"),
+                lambda_penalty=10.0,
+                diversity_mode=diversity_mode,
+                random_seed=42
+            )
+
+            # SPEA2
+            print("[Running SPEA2...]")
+
+            spea2_result = spea2(
+                user_id=user_id,
+                population_size=50,
+                generations=50,
+                objective_names=("preference", "cost", "co2"),
+                lambda_penalty=10.0,
+                diversity_mode=diversity_mode,
+                random_seed=42
+            )
+
+            # Deduplicate
+            nsga2_unique = deduplicate_solutions(nsga2_result["best_front"])
+            spea2_unique = deduplicate_solutions(spea2_result["best_individuals"])
+
+            # Analyze
+            nsga2_stats = analyze_solutions(nsga2_unique)
+            spea2_stats = analyze_solutions(spea2_unique)
+
+            # Store objectives
+            all_objectives_by_case[(diversity_mode, user_id)] = {
+                "nsga2": nsga2_stats["objectives"],
+                "spea2": spea2_stats["objectives"]
+            }
+
+            # Print results
+            print_stats(
+                "NSGA-II",
+                len(nsga2_result["best_front"]),
+                nsga2_stats,
+                len(nsga2_result["best_front"])
+            )
+
+            print_stats(
+                "SPEA2",
+                len(spea2_result["best_individuals"]),
+                spea2_stats,
+                len(spea2_result["best_individuals"])
+            )
+
+            # Save summary rows
+            summary_rows.append({
+                "diversity_mode": diversity_mode,
+                "user_id": user_id,
+                "algorithm": "NSGA-II",
+                "unique_solutions": nsga2_stats["count"],
+                "avg_preference": nsga2_stats["avg_preference"],
+                "avg_cost": nsga2_stats["avg_cost"],
+                "avg_co2": nsga2_stats["avg_co2"],
+                "avg_nutrient_penalty": nsga2_stats["avg_nutrient_penalty"],
+                "avg_total_penalty": nsga2_stats["avg_total_penalty"],
+                "avg_constraint_compliance": nsga2_stats["avg_constraint_compliance"],
+                "avg_diversity": nsga2_stats["avg_diversity"],
+                "hypervolume": ""
+            })
+
+            summary_rows.append({
+                "diversity_mode": diversity_mode,
+                "user_id": user_id,
+                "algorithm": "SPEA2",
+                "unique_solutions": spea2_stats["count"],
+                "avg_preference": spea2_stats["avg_preference"],
+                "avg_cost": spea2_stats["avg_cost"],
+                "avg_co2": spea2_stats["avg_co2"],
+                "avg_nutrient_penalty": spea2_stats["avg_nutrient_penalty"],
+                "avg_total_penalty": spea2_stats["avg_total_penalty"],
+                "avg_constraint_compliance": spea2_stats["avg_constraint_compliance"],
+                "avg_diversity": spea2_stats["avg_diversity"],
+                "hypervolume": ""
+            })
+
+    # Hypervolume
+    print(f"\n{'=' * 80}")
+    print("HYPERVOLUME ANALYSIS")
+    print(f"{'=' * 80}\n")
+
+    for diversity_mode in ["none", "penalty"]:
+
+        print(f"\nDiversity mode: {diversity_mode}")
+
+        for user_id in [1, 2]:
+
+            all_objectives = (
+                all_objectives_by_case[(diversity_mode, user_id)]["nsga2"] +
+                all_objectives_by_case[(diversity_mode, user_id)]["spea2"]
+            )
+
+            ref_point = get_reference_point(
+                all_objectives,
+                margin=0.10
+            )
+
+            nsga2_hv = approximate_hypervolume(
+                all_objectives_by_case[(diversity_mode, user_id)]["nsga2"],
+                ref_point,
+                samples=20000,
+                seed=42
+            )
+
+            spea2_hv = approximate_hypervolume(
+                all_objectives_by_case[(diversity_mode, user_id)]["spea2"],
+                ref_point,
+                samples=20000,
+                seed=42
+            )
+
+            winner = "NSGA-II" if nsga2_hv > spea2_hv else "SPEA2"
+
+            print(f"User {user_id}:")
+            print(f"  Reference Point: {tuple(f'{x:.2f}' for x in ref_point)}")
+            print(f"  NSGA-II Hypervolume: {nsga2_hv:.2f}")
+            print(f"  SPEA2 Hypervolume:   {spea2_hv:.2f}")
+            print(f"  Winner: {winner} ({abs(nsga2_hv - spea2_hv):.2f} difference)")
+            print()
+
+            # Save hypervolume to rows
+            for row in summary_rows:
+                if (
+                    row["diversity_mode"] == diversity_mode and
+                    row["user_id"] == user_id
+                ):
+                    if row["algorithm"] == "NSGA-II":
+                        row["hypervolume"] = nsga2_hv
+
+                    elif row["algorithm"] == "SPEA2":
+                        row["hypervolume"] = spea2_hv
+
+    # Save CSV
+    with open("results_summary.csv", "w", newline="", encoding="utf-8") as f:
+
+        writer = csv.DictWriter(
+            f,
+            fieldnames=summary_rows[0].keys()
+        )
+
+        writer.writeheader()
+        writer.writerows(summary_rows)
+
+    print("\nResults saved to results_summary.csv")
+
+    print("=" * 80)
+    print("SUMMARY")
+    print("=" * 80)
+
+    print("""
 Both NSGA-II and SPEA2 have been compared with:
 - Identical parameters (pop=50, gen=50, lambda=10.0)
+- Two diversity modes: none and penalty
 - Deduplication applied to both
 - Hypervolume calculated using Monte Carlo approximation
 - Constraint compliance measured (0-5 nutrients)
@@ -216,3 +302,5 @@ Key metrics:
 """)
 
 
+if __name__ == "__main__":
+    run_experiment()

@@ -1,5 +1,3 @@
-#Kromozom → gerçek menü. Greedy soldan sağa tarar: kahvaltı için sadece energy+protein sınırları (günlük DRI'nın %35'i),
-#ana yemek için kalan 5 besin birlikte. ε toleransı: üst sınır ×1.15, alt sınır ×0.90 — bu olmazsa hiçbir çözüm "feasible" bulamazdı.
 from load_data import load_food_data, load_dri
 
 TARGET_NUTRIENTS = [
@@ -15,6 +13,10 @@ BREAKFAST_NUTRIENTS = [
     "protein"
 ]
 
+# Aynı food group'tan çok fazla yemek seçilmesini engellemek için
+MAX_SAME_GROUP_BREAKFAST = 2
+MAX_SAME_GROUP_MAIN = 2
+
 
 def get_food_nutrients(food_id, nutrients_by_food):
     return nutrients_by_food.get(food_id, {
@@ -26,6 +28,7 @@ def get_food_nutrients(food_id, nutrients_by_food):
     })
 
 
+# Eklersem nutrient üst limitlerini aşar mı?
 def can_add_food(food_id, totals, nutrients_by_food, upper_limits):
     food_nutrients = get_food_nutrients(food_id, nutrients_by_food)
 
@@ -45,6 +48,47 @@ def add_food(food_id, totals, nutrients_by_food):
         totals[nutrient] += food_nutrients[nutrient]
 
 
+def get_food_group_id(food_id, foods_by_id):
+    """
+    Food'un ait olduğu foodGroupId değerini döndürür.
+    Eğer food bulunamazsa None döner.
+    """
+    if food_id not in foods_by_id:
+        return None
+
+    return foods_by_id[food_id].get("foodGroupId")
+
+
+def can_add_by_group_limit(food_id, foods_by_id, group_counts, max_same_group):
+    """
+    Aynı foodGroupId'den çok fazla yemek seçilmesini engeller.
+    Örneğin çorba grubundan 2 tane seçildiyse 3. çorbayı almaz.
+    """
+    group_id = get_food_group_id(food_id, foods_by_id)
+
+    if group_id is None:
+        return True
+
+    current_count = group_counts.get(group_id, 0)
+
+    if current_count >= max_same_group:
+        return False
+
+    return True
+
+
+def add_group_count(food_id, foods_by_id, group_counts):
+    """
+    Seçilen yemeğin foodGroupId sayacını artırır.
+    """
+    group_id = get_food_group_id(food_id, foods_by_id)
+
+    if group_id is None:
+        return
+
+    group_counts[group_id] = group_counts.get(group_id, 0) + 1
+
+
 def decode(chromosome, breakfast_size, user_id):
     foods_by_id, nutrients_by_food = load_food_data(user_id)
     dri = load_dri(user_id)
@@ -54,6 +98,9 @@ def decode(chromosome, breakfast_size, user_id):
 
     selected_breakfast = []
     selected_main = []
+
+    breakfast_group_counts = {}
+    main_group_counts = {}
 
     totals = {
         "energy": 0,
@@ -94,6 +141,15 @@ def decode(chromosome, breakfast_size, user_id):
     # 1) KAHVALTI DECODE
     for food_id in breakfast_part:
 
+        # Aynı food group'tan çok fazla kahvaltılık seçilmesin
+        if not can_add_by_group_limit(
+            food_id,
+            foods_by_id,
+            breakfast_group_counts,
+            MAX_SAME_GROUP_BREAKFAST
+        ):
+            continue
+
         # Kahvaltı energy/protein üst sınırını aşmasın
         if not can_add_food(food_id, totals, nutrients_by_food, breakfast_upper_limits):
             continue
@@ -104,6 +160,7 @@ def decode(chromosome, breakfast_size, user_id):
 
         selected_breakfast.append(food_id)
         add_food(food_id, totals, nutrients_by_food)
+        add_group_count(food_id, foods_by_id, breakfast_group_counts)
 
         # Kahvaltı için energy + protein alt hedefleri sağlandıysa dur
         if (
@@ -115,12 +172,22 @@ def decode(chromosome, breakfast_size, user_id):
     # 2) ÖĞLE + AKŞAM DECODE
     for food_id in main_part:
 
+        # Aynı food group'tan çok fazla ana öğün yemeği seçilmesin
+        if not can_add_by_group_limit(
+            food_id,
+            foods_by_id,
+            main_group_counts,
+            MAX_SAME_GROUP_MAIN
+        ):
+            continue
+
         # 5 nutrient günlük üst sınırı aşılırsa yemeği alma
         if not can_add_food(food_id, totals, nutrients_by_food, daily_upper_limits):
             continue
 
         selected_main.append(food_id)
         add_food(food_id, totals, nutrients_by_food)
+        add_group_count(food_id, foods_by_id, main_group_counts)
 
         all_lower_satisfied = all(
             totals[nutrient] >= daily_lower_limits[nutrient]
