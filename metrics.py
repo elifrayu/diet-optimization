@@ -3,7 +3,7 @@ Metrics for Multi-Objective Optimization
 
 Implements hypervolume approximation using Monte Carlo sampling.
 """
-
+#Hypervolume Monte Carlo ile hesaplar, referans noktası bulur (worst + %10), constraint compliance sayar (5 besin'den kaçı DRI içinde).
 import random
 
 

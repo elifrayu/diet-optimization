@@ -1,3 +1,6 @@
+#NSGA-II algoritması. Non-dominated sorting ile bireyler Pareto cephelerine ayrılır,
+#crowding distance ile aynı cephedeki çeşitlilik korunur, tournament selection ile ebeveynler seçilir.
+
 import random
 import math
 from chromosome import create_individual, crossover, mutate
@@ -179,33 +182,36 @@ def tournament_selection(population, tournament_size=2):
 
 def create_offspring(parent1, parent2, crossover_rate=0.9):
     """
-    İki parentten bir offspring oluştur (crossover + mutation)
+    İki parentten İKİ offspring oluştur (crossover + mutation).
+    crossover() zaten 2 child üretiyor — ikisi de kullanılıyor.
     """
-    # Crossover (probability-based)
+    def make_ind(chrom):
+        return Individual(
+            chrom,
+            parent1.breakfast_size,
+            parent1.user_id,
+            objective_names=parent1.objective_names,
+            diversity_mode=parent1.diversity_mode,
+            alpha_diversity=parent1.alpha_diversity,
+            lambda_penalty=parent1.lambda_penalty
+        )
+
+    # Crossover (probability-based) — her iki child da üretilir
     if random.random() < crossover_rate:
-        child_chromosome, _ = crossover(
+        c1_chrom, c2_chrom = crossover(
             parent1.chromosome,
             parent2.chromosome,
             parent1.breakfast_size
         )
     else:
-        child_chromosome = parent1.chromosome.copy()
+        c1_chrom = parent1.chromosome.copy()
+        c2_chrom = parent2.chromosome.copy()
 
-    # Mutation (always applied)
-    child_chromosome = mutate(child_chromosome, parent1.breakfast_size)
+    # Mutation her iki child'a da uygulanır
+    c1_chrom = mutate(c1_chrom, parent1.breakfast_size)
+    c2_chrom = mutate(c2_chrom, parent1.breakfast_size)
 
-    # Yeni Individual oluştur
-    child = Individual(
-        child_chromosome,
-        parent1.breakfast_size,
-        parent1.user_id,
-        objective_names=parent1.objective_names,
-        diversity_mode=parent1.diversity_mode,
-        alpha_diversity=parent1.alpha_diversity,
-        lambda_penalty=parent1.lambda_penalty
-    )
-
-    return child
+    return make_ind(c1_chrom), make_ind(c2_chrom)
 
 
 def nsga2(user_id, population_size=20, generations=10,
@@ -273,13 +279,16 @@ def nsga2(user_id, population_size=20, generations=10,
             })
 
         # Parent selection ve reproduction (offspring oluştur)
+        # create_offspring 2 child döndürüyor, ikisi de kullanılıyor
         offspring = []
         while len(offspring) < population_size:
             parent1 = tournament_selection(population)
             parent2 = tournament_selection(population)
-            child = create_offspring(parent1, parent2, crossover_rate=crossover_rate)
-            child.evaluate()
-            offspring.append(child)
+            c1, c2 = create_offspring(parent1, parent2, crossover_rate=crossover_rate)
+            c1.evaluate()
+            c2.evaluate()
+            offspring.extend([c1, c2])
+        offspring = offspring[:population_size]
 
         # Environmental selection (parent + offspring = 2N, seç N)
         combined = population + offspring
@@ -301,4 +310,3 @@ def nsga2(user_id, population_size=20, generations=10,
         "best_front": best_front,
         "history": history
     }
-

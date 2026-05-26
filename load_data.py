@@ -1,10 +1,15 @@
+#Veritabanından veri çeker, 4 fonksiyon: get_pool (hangi yiyecekler kahvaltıya ait, hangisi ana yemeğe), 
+# load_food_data (her yiyeceğin maliyet/tercih/co2/süre bilgileri + besin değerleri), 
+# load_dri (kullanıcının yaş+cinsiyetine göre günlük besin sınırları), 
+# normalize_nutrient_name (DB'deki uzun nutrient isimlerini energy, protein gibi kısa anahtarlara çevirir).
+
 from db import get_connection
 
 # Kahvaltı grupları (food_group.name)
 BREAKFAST_GROUP_NAMES = (
     'Dairy Products', 'Chicken Products', 'Meat Products',
     'Jams Syrups', 'Honey Products', 'Seed Bean Olive',
-    'Salads', 'Bakery', 'Sweet Things Marmelades',
+    'Salads', 'Bakery', 'Sweet Things marmelades',
     'Beverages', 'Cereals', 'Beverages 2', 'Bakery 2'
 )
 

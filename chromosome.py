@@ -1,3 +1,7 @@
+#chromosome.py — Genetik operatörler. create_individual rastgele bir permütasyon kromozom üretir (kahvaltı parçası + ana yemek parçası). 
+# ox_crossover_part iki ebeveynden OX yöntemiyle çocuk üretir — permütasyon yapısını bozmuyor, yani aynı yiyecek iki kez gelmiyor. 
+# mutate iki geni yer değiştirir, oran 1/n parça uzunluğu.
+
 import random
 from load_data import get_pool
 

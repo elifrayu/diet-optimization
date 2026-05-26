@@ -1,3 +1,6 @@
+#Menünün kalitesini sayıya döker. Penalty: 0.7×alt_ihlal + 0.3×üst_ihlal. 
+#Objective vektörü minimize formatında: preference için negatif işaret (MAX→MIN dönüşümü), cost ve co2 için penalty eklenir.
+
 from decoder import decode
 from load_data import load_food_data, load_dri
 

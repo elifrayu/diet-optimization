@@ -1,3 +1,7 @@
+#SPEA2 algoritması. Her bireyin strength değeri (kaç kişiyi domine ettiği),
+#raw fitness (kendisini domine edenlerin strength toplamı), k-NN density ile birleştirilir. 
+#Archive mekanizması ile non-dominated çözümler saklanır.
+
 import random
 import math
 from chromosome import create_individual, crossover, mutate

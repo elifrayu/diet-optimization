@@ -1,3 +1,5 @@
+#Kromozom → gerçek menü. Greedy soldan sağa tarar: kahvaltı için sadece energy+protein sınırları (günlük DRI'nın %35'i),
+#ana yemek için kalan 5 besin birlikte. ε toleransı: üst sınır ×1.15, alt sınır ×0.90 — bu olmazsa hiçbir çözüm "feasible" bulamazdı.
 from load_data import load_food_data, load_dri
 
 TARGET_NUTRIENTS = [
